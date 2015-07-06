@@ -30,7 +30,7 @@ from twisted.conch.ssh import factory, transport, service
 from twisted.conch.ssh.transport import SSHCiphers
 from twisted.python import log
 from twisted.internet import reactor, defer, threads
-from honssh import client, output, networking, honsshServer, connections
+from honssh import client, output, networking, honsshServer, connections, elastic
 from honssh.protocols import sftp, ssh
 from kippo.core.config import config
 from kippo.dblog import mysql
@@ -162,12 +162,17 @@ class HonsshServerFactory(factory.SSHFactory):
     connections = connections.Connections()
     hpLog = None
     dbLog = None
+    esLog = None
     
     def __init__(self):
         clientFactory = client.HonsshSlimClientFactory()
         clientFactory.server = self
         
         reactor.connectTCP(self.cfg.get('honeypot', 'honey_addr'), int(self.cfg.get('honeypot', 'honey_port')), clientFactory)
+
+        if self.cfg.get('elasticsearch', 'enabled') == 'true':
+            es = elastic.ESLogger()
+            self.esLog = es.start(self.cfg)
                
         if self.cfg.get('hpfeeds', 'enabled') == 'true':
             hp = hpfeeds.HPLogger()

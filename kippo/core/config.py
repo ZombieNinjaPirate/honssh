@@ -57,7 +57,7 @@ def validateConfig(cfg):
             validConfig = False
             
     #Check prop exists and is true/false
-    props = [['advNet','enabled'], ['interact','enabled'], ['spoof','enabled'], ['txtlog','enabled'], ['database_mysql','enabled'], ['email','login'], ['email','attack'], ['hpfeeds','enabled'], ['download','passive'], ['download','active'], ['packets','enabled'], ['hp-restrict', 'disable_publicKey'], ['hp-restrict', 'disable_x11'], ['hp-restrict', 'disable_sftp'], ['hp-restrict', 'disable_exec'], ['hp-restrict', 'disable_port_forwarding']]
+    props = [['advNet','enabled'], ['interact','enabled'], ['spoof','enabled'], ['txtlog','enabled'], ['database_mysql','enabled'], ['email','login'], ['email','attack'], ['hpfeeds','enabled'], ['download','passive'], ['download','active'], ['packets','enabled'], ['hp-restrict', 'disable_publicKey'], ['hp-restrict', 'disable_x11'], ['hp-restrict', 'disable_sftp'], ['hp-restrict', 'disable_exec'], ['hp-restrict', 'disable_port_forwarding'], ['elasticsearch','enabled']]
     for prop in props:
         if not checkExist(cfg,prop) or not checkValidBool(cfg, prop):
             validConfig = False
@@ -119,6 +119,16 @@ def validateConfig(cfg):
         prop = ['hpfeeds','port']
         if not checkExist(cfg,prop) or not checkValidPort(cfg,prop):
             validConfig = False
+            
+    #If elasticsearch is enabled check it's config
+    if cfg.get('elasticsearch','enabled') == 'true':
+        props = [['elasticsearch','server']]
+        for prop in props:
+            if not checkExist(cfg,prop):
+                validConfig = False
+        prop = ['elasticsearch','port']
+        if not checkExist(cfg,prop) or not checkValidPort(cfg,prop):
+            validConfig = False 
     
 
     return validConfig

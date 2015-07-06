@@ -30,6 +30,7 @@ from twisted.python import log
 from twisted.internet import threads, reactor
 from kippo.core.config import config
 from honssh import txtlog
+from honssh import elastic
 from kippo.core import ttylog
 from kippo.dblog import mysql
 from hpfeeds import hpfeeds
@@ -41,6 +42,8 @@ class Output():
     def __init__(self, factory):
         self.hpLogClient = factory.hpLog
         self.dbLogClient = factory.dbLog
+        self.esLogClient = factory.esLog
+
         self.connections = factory.connections
     
     def connectionMade(self, ip, port, honeyIP, honeyPort, sensorName):
@@ -57,7 +60,7 @@ class Output():
         self.passwordTried = False
         self.loginSuccess = False
         self.ttyFiles = []
-
+        self.pcapFile = ''
         
         if self.cfg.get('txtlog', 'enabled') == 'true':
             self.connectionString = '[POT  ] ' + self.sensorName + ' - ' + self.honeyIP + ':' + str(self.honeyPort)
@@ -73,6 +76,10 @@ class Output():
         if self.cfg.get('hpfeeds', 'enabled') == 'true':
             self.hpLog = hpfeeds.HPLogger()
             self.hpLog.setClient(self.hpLogClient, self.cfg, self.sensorName)
+            
+        if self.cfg.get('elasticsearch', 'enabled') == 'true':
+            self.esLog = elastic.ESLogger()
+            self.esLog.setClient(self.esLogClient, self.cfg, self.sensorName)
         
         if self.cfg.has_option('app_hooks', 'connection_made'):
             if self.cfg.get('app_hooks', 'connection_made') != '':
@@ -97,6 +104,8 @@ class Output():
                 self.dbLog.handleConnectionLost(dt, self.sessionID)
             if self.cfg.get('hpfeeds', 'enabled') == 'true':
                 self.hpLog.handleConnectionLost(dt)
+            if self.cfg.get('elasticsearch', 'enabled') == 'true':
+                self.esLog.handleConnectionLost(dt)
             if self.cfg.get('email', 'attack') == 'true':
                 threads.deferToThread(self.email, self.sensorName + ' - Attack logged', self.txtlog_file, self.ttyFiles)
         
@@ -137,6 +146,11 @@ class Output():
             self.hpLog.createSession(dt, self.sessionID, self.endIP, self.endPort, self.honeyIP, self.honeyPort)
             self.hpLog.handleClientVersion(self.version)
             
+        if self.cfg.get('elasticsearch', 'enabled') == 'true':
+            self.esLog.handleLoginSucceeded(dt, username, password, self.endIP)
+            self.esLog.createSession(dt, self.sessionID, self.endIP, self.endPort, self.honeyIP, self.honeyPort)
+            self.esLog.handleClientVersion(self.version)
+            
         if self.cfg.has_option('app_hooks', 'login_successful'):
             if self.cfg.get('app_hooks', 'login_successful') != '':
                 cmdString = self.cfg.get('app_hooks', 'login_successful') + " LOGIN_SUCCESSFUL " + dt + " " + self.endIP + " " + username + " " + password
@@ -154,6 +168,9 @@ class Output():
         if self.cfg.get('hpfeeds', 'enabled') == 'true':
             self.hpLog.handleLoginFailed(dt, username, password)
             
+        if self.cfg.get('elasticsearch', 'enabled') == 'true':
+            self.esLog.handleLoginFailed(dt, username, password, self.endIP)
+            
         if self.cfg.has_option('app_hooks', 'login_failed'):
             if self.cfg.get('app_hooks', 'login_failed') != '':
                 cmdString = self.cfg.get('app_hooks', 'login_failed') + " LOGIN_FAILED " + dt + " " + self.endIP + " " + username + " " + password
@@ -168,6 +185,8 @@ class Output():
             self.dbLog.handleCommand(dt, uuid, theCommand)
         if self.cfg.get('hpfeeds', 'enabled') == 'true':
             self.hpLog.handleCommand(dt, uuid, theCommand)
+        if self.cfg.get('elasticsearch', 'enabled') == 'true':
+            self.esLog.handleCommand(dt, uuid, theCommand)
             
         theCommandsSplit = re.findall(r'(?:[^;&|<>"\']|["\'](?:\\.|[^"\'])*[\'"])+', theCommand)
         theCMDs = []
@@ -250,6 +269,9 @@ class Output():
             
         if self.cfg.get('hpfeeds', 'enabled') == 'true':
             self.hpLog.channelOpened(dt, uuid, channelName)
+        
+        if self.cfg.get('elasticsearch', 'enabled') == 'true':
+            self.esLog.channelOpened(dt, uuid, channelName)
           
         self.connections.addChannel(self.sensorName, self.endIP, self.endPort, channelName, dt, uuid)
             
@@ -263,6 +285,9 @@ class Output():
             
         if self.cfg.get('hpfeeds', 'enabled') == 'true':
             self.hpLog.channelClosed(dt, channel.uuid, channel.ttylog_file)
+            
+        if self.cfg.get('elasticsearch', 'enabled') == 'true':
+            self.esLog.channelClosed(dt, channel.uuid, channel.ttylog_file)
             
         if channel.ttylog_file != None:
             self.ttyFiles.append(channel.ttylog_file)
