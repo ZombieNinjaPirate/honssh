@@ -1,0 +1,14 @@
+= honssh/honsshctrl.sh
+  - replace if-then with case
+    - convert to init script 
+
+= honssh/*
+  - integrate geoip2.database
+    - update geoip2 every 30 days
+
+= honssh/utils/honssh.sql
+  - add field to hold geoloc from geoip2
+
+= honssh/utils/collectd-honssh.conf
+  - dbi plugin for CollectD
+    - push aggregated metrics from MySQL to Graphite 
